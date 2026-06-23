@@ -1,349 +1,389 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Badge,
-  Button,
-  Card,
-  Field,
-  Select,
-  Spinner,
-  Text,
-  TextArea,
-  TextInput,
-} from "@/components/ds";
-import { buildFlags, hasForbiddenDash } from "@/lib/clean";
+  BlogArtifact,
+  CountrySelect,
+  FaqArtifact,
+  JijuMark,
+  KbArtifact,
+  MarkdownArtifact,
+  WorkingIndicator,
+  type Option,
+} from "@/components/chat";
 import { COUNTRIES, GROUPS, WORLD_COUNTRIES } from "@/lib/countries";
-import { exportFilename, toMarkdown, toMarkdownWithSchema } from "@/lib/markdown";
-import { toScriptTag } from "@/lib/schema";
-import type {
-  AtlysSource,
-  FaqItem,
-  GeneratedContent,
-  KeywordResult,
-  ReviewFlagKind,
-} from "@/lib/types";
+import type { ChatArtifact } from "@/lib/chat-types";
 
-interface ApiResult {
-  content: GeneratedContent;
-  keywords: KeywordResult;
-  source: AtlysSource;
-}
-
-const DESTINATION_OPTIONS = [
+const DESTINATION_OPTIONS: Option[] = [
   ...GROUPS.map((g) => ({ value: g.id, label: `${g.name} (group)` })),
   ...COUNTRIES.map((c) => ({ value: c.iso2, label: c.name })),
 ];
-
-const COUNTRY_OPTIONS = WORLD_COUNTRIES.map((c) => ({
-  value: c.iso2,
-  label: c.name,
-}));
-
-const LOCALE_OPTIONS = [
+const COUNTRY_OPTIONS: Option[] = WORLD_COUNTRIES.map((c) => ({ value: c.iso2, label: c.name }));
+const LOCALE_OPTIONS: Option[] = [
   { value: "en-US", label: "en-US" },
   { value: "en-GB", label: "en-GB" },
   { value: "en-IN", label: "en-IN" },
 ];
 
-const CONTENT_TYPE_OPTIONS = [
+const INTENTS: Array<{ value: string; label: string }> = [
+  { value: "auto", label: "Auto" },
   { value: "faqs", label: "FAQs" },
-  { value: "blog", label: "Blog (soon)", disabled: true },
+  { value: "blog", label: "Blog" },
+  { value: "kb", label: "Knowledge Base" },
+  { value: "freeform", label: "Anything" },
 ];
 
-const FLAG_TONE: Record<ReviewFlagKind, "warn" | "danger" | "neutral"> = {
-  "factual-claim": "warn",
-  "unsupported-number": "warn",
-  "dash-residual": "danger",
-  "ai-tell": "neutral",
-  "keyword-stuffing": "neutral",
-};
+const EXAMPLES: Array<{ title: string; sub: string; prompt: string; intent: string }> = [
+  { title: "FAQs for a CLP", sub: "Schengen visa page", prompt: "Draft 10 extensive, keyword-rich FAQs for the Schengen visa page.", intent: "faqs" },
+  { title: "A blog hub", sub: "UK visa, full guide", prompt: "Write a complete UK visa hub blog following the Atlys playbook.", intent: "blog" },
+  { title: "Knowledge base", sub: "for an AI agent", prompt: "Build a knowledge base of questions for a US visa AI agent.", intent: "kb" },
+  { title: "Anything else", sub: "captions, emails, copy", prompt: "Write 5 punchy Instagram captions for Dubai visa season.", intent: "freeform" },
+];
+
+interface Msg {
+  id: string;
+  role: "user" | "assistant";
+  text?: string;
+  ctx?: { destination: string; citizenship: string; residence: string; intent: string };
+  working?: boolean;
+  status?: string;
+  draft?: string;
+  intent?: string;
+  artifact?: ChatArtifact;
+}
+
+function labelOf(options: Option[], value: string): string {
+  return options.find((o) => o.value === value)?.label ?? value;
+}
 
 export default function Page() {
   const [destination, setDestination] = useState("schengen");
   const [citizenship, setCitizenship] = useState("IN");
   const [residence, setResidence] = useState("AE");
   const [locale, setLocale] = useState("en-US");
-  const [contentType, setContentType] = useState("faqs");
-  const [count, setCount] = useState(10);
+  const [intent, setIntent] = useState("auto");
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [messages, setMessages] = useState<Msg[]>([]);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [result, setResult] = useState<ApiResult | null>(null);
-  const [faqs, setFaqs] = useState<FaqItem[]>([]);
-  const [toast, setToast] = useState("");
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  const facts = result?.source.facts ?? [];
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  const currentContent: GeneratedContent | null = useMemo(() => {
-    if (!result) return null;
-    return { ...result.content, faqs };
-  }, [result, faqs]);
+  function grow() {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
+  }
 
-  async function generate() {
-    setLoading(true);
-    setError("");
-    setResult(null);
-    setFaqs([]);
+  function patch(id: string, p: Partial<Msg>) {
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...p } : m)));
+  }
+
+  async function send(text: string) {
+    const message = text.trim();
+    if (!message || sending) return;
+    const uid = `u${messages.length}-${message.length}`;
+    const aid = `a${messages.length}-${message.length}`;
+    setMessages((prev) => [
+      ...prev,
+      { id: uid, role: "user", text: message, ctx: { destination, citizenship, residence, intent } },
+      { id: aid, role: "assistant", working: true, status: "", draft: "", intent: intent !== "auto" ? intent : "" },
+    ]);
+    setInput("");
+    setSending(true);
+    setTimeout(grow, 0);
+
     try {
-      const res = await fetch("/api/generate", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ destination, citizenship, residence, locale, contentType, count }),
+        body: JSON.stringify({ message, destination, citizenship, residence, locale, intent }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail ? `${data.error}: ${data.detail}` : data.error);
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({ error: "Request failed" }));
+        patch(aid, { working: false, text: data.detail ? `${data.error}: ${data.detail}` : data.error || "Request failed" });
         return;
       }
-      setResult(data as ApiResult);
-      setFaqs((data as ApiResult).content.faqs);
-    } catch (e) {
-      setError(String(e));
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          let e: any;
+          try {
+            e = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (e.type === "status") patch(aid, { status: e.text });
+          else if (e.type === "meta") patch(aid, { intent: e.intent });
+          else if (e.type === "delta") setMessages((prev) => prev.map((m) => (m.id === aid ? { ...m, draft: (m.draft || "") + e.text } : m)));
+          else if (e.type === "message") patch(aid, { text: e.text });
+          else if (e.type === "artifact") patch(aid, { artifact: e.artifact, working: false });
+          else if (e.type === "error") patch(aid, { working: false, text: e.error });
+        }
+      }
+      patch(aid, { working: false });
+    } catch (err) {
+      patch(aid, { working: false, text: String(err) });
     } finally {
-      setLoading(false);
+      setSending(false);
     }
   }
 
-  function updateFaq(id: string, patch: Partial<FaqItem>) {
-    setFaqs((prev) =>
-      prev.map((f) => {
-        if (f.id !== id) return f;
-        const next = { ...f, ...patch };
-        if (patch.answer !== undefined || patch.question !== undefined) {
-          next.reviewFlags = buildFlags(next.answer, next.targetKeywords, facts);
-        }
-        return next;
-      }),
-    );
-  }
-
-  function flash(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(""), 1600);
-  }
-
-  async function copy(text: string, label: string) {
-    await navigator.clipboard.writeText(text);
-    flash(`${label} copied`);
-  }
-
-  function download() {
-    if (!currentContent) return;
-    const blob = new Blob([toMarkdownWithSchema(currentContent)], {
-      type: "text/markdown",
-    });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = exportFilename(currentContent);
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  const anyDash = faqs.some(
-    (f) => hasForbiddenDash(f.question) || hasForbiddenDash(f.answer),
-  );
-
   return (
-    <main style={{ maxWidth: 1040, margin: "0 auto", padding: "40px 24px 80px" }}>
-      <header style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", gap: 16, marginBottom: 8, fontSize: 13 }}>
-          <span style={{ fontWeight: 700, color: "var(--atlys-brand-blue)" }}>FAQs</span>
-          <a href="/kb" style={{ color: "var(--atlys-muted)" }}>Knowledge Base →</a>
-        </div>
-        <Text as="h1" size={30} weight={800}>
-          JIJU
-        </Text>
-        <Text color="var(--atlys-muted)" style={{ marginTop: 6 }}>
-          Extensive, keyword-rich, dash-free CLP FAQs grounded on live atlys.com facts.
-        </Text>
-      </header>
-
-      <Card style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 16,
-          }}
-        >
-          <Field label="Destination" hint="The visa / CLP">
-            <Select value={destination} onChange={setDestination} options={DESTINATION_OPTIONS} />
-          </Field>
-          <Field label="Citizenship" hint="Passport country">
-            <Select value={citizenship} onChange={setCitizenship} options={COUNTRY_OPTIONS} />
-          </Field>
-          <Field label="Residence" hint="Where they live / apply">
-            <Select value={residence} onChange={setResidence} options={COUNTRY_OPTIONS} />
-          </Field>
-          <Field label="Locale">
-            <Select value={locale} onChange={setLocale} options={LOCALE_OPTIONS} />
-          </Field>
-          <Field label="Content type">
-            <Select value={contentType} onChange={setContentType} options={CONTENT_TYPE_OPTIONS} />
-          </Field>
-          <Field label="How many FAQs">
-            <TextInput
-              type="number"
-              value={String(count)}
-              onChange={(v) => setCount(Math.max(1, Math.min(15, Number(v) || 1)))}
-            />
-          </Field>
-        </div>
-        <div style={{ marginTop: 18 }}>
-          <Button onClick={generate} loading={loading} size="lg">
-            {loading ? "Generating" : "Generate FAQs"}
-          </Button>
-        </div>
-      </Card>
-
-      {loading && (
-        <Card style={{ marginBottom: 24, display: "flex", gap: 12, alignItems: "center", color: "var(--atlys-brand-blue)" }}>
-          <Spinner size={18} />
-          <Text color="var(--atlys-muted)">
-            Researching keywords, reading atlys.com, and writing extensive FAQs. This can take a minute.
-          </Text>
-        </Card>
-      )}
-
-      {error && (
-        <Card style={{ marginBottom: 24, borderColor: "var(--atlys-red)" }}>
-          <Text weight={700} color="var(--atlys-red)">Generation failed</Text>
-          <Text color="var(--atlys-muted)" style={{ marginTop: 6, fontSize: 14 }}>{error}</Text>
-        </Card>
-      )}
-
-      {result && currentContent && (
-        <>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
-            <Text weight={700} size={18}>{result.content.entityName} visa</Text>
-            <Badge tone={result.keywords.source === "mock" ? "warn" : "brand"}>
-              keywords: {result.keywords.source}
-            </Badge>
-            <Badge tone={anyDash ? "danger" : "good"}>
-              {anyDash ? "em/en dash present" : "dash-clean"}
-            </Badge>
-            {result.source.url && (
-              <a href={result.source.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "var(--atlys-brand-blue)" }}>
-                source page
-              </a>
-            )}
-          </div>
-
-          <Collapsible title={`Keywords used (${result.keywords.clusters.length} clusters)`}>
-            {result.keywords.notes && (
-              <Text color="var(--atlys-muted)" style={{ fontSize: 13, marginBottom: 8 }}>{result.keywords.notes}</Text>
-            )}
-            {result.keywords.clusters.map((c) => (
-              <div key={c.topic} style={{ marginBottom: 10 }}>
-                <Text weight={600} size={14}>{c.topic}</Text>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-                  {c.keywords.slice(0, 10).map((k) => (
-                    <Badge key={k.phrase} tone="neutral">
-                      {k.phrase}{k.volume ? ` · ${k.volume}` : ""}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </Collapsible>
-
-          <Collapsible title={`Facts from atlys.com (${facts.length})`}>
-            {facts.length === 0 ? (
-              <Text color="var(--atlys-muted)" style={{ fontSize: 13 }}>
-                No structured facts extracted. The model was told not to state specific numbers it cannot ground. Verify any figures manually.
-              </Text>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {facts.map((f, i) => (
-                  <Badge key={i} tone="neutral">{f.label}: {f.value}</Badge>
-                ))}
-              </div>
-            )}
-          </Collapsible>
-
-          <Card style={{ margin: "16px 0", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <Text weight={600} size={14}>Export:</Text>
-            <Button size="sm" variant="secondary" onClick={() => copy(toMarkdown(currentContent), "Markdown")}>Copy Markdown</Button>
-            <Button size="sm" variant="secondary" onClick={() => copy(toScriptTag(currentContent.faqs), "JSON-LD")}>Copy JSON-LD</Button>
-            <Button size="sm" onClick={download}>Download .md</Button>
-            {toast && <Badge tone="good">{toast}</Badge>}
-          </Card>
-
-          <div style={{ display: "grid", gap: 16 }}>
-            {faqs.map((f, i) => (
-              <FaqCard key={f.id} index={i} faq={f} onChange={updateFaq} />
-            ))}
-          </div>
-        </>
-      )}
-    </main>
-  );
-}
-
-function Collapsible({ title, children }: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Card style={{ marginBottom: 12, padding: 0 }}>
-      <button
-        onClick={() => setOpen((o) => !o)}
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <header
         style={{
-          width: "100%", textAlign: "left", padding: "14px 20px", background: "transparent",
-          border: "none", cursor: "pointer", fontWeight: 600, fontSize: 14,
-          display: "flex", justifyContent: "space-between",
+          position: "sticky",
+          top: 0,
+          zIndex: 30,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "14px 20px",
+          borderBottom: "1px solid var(--line)",
+          background: "rgba(251,250,247,0.82)",
+          backdropFilter: "blur(10px)",
         }}
       >
-        <span>{title}</span>
-        <span style={{ color: "var(--atlys-muted)" }}>{open ? "−" : "+"}</span>
-      </button>
-      {open && <div style={{ padding: "0 20px 18px" }}>{children}</div>}
-    </Card>
+        <JijuMark size={30} />
+        <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 19, letterSpacing: "-0.02em" }}>JIJU</div>
+        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Atlys Content Studio</div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 14, alignItems: "center" }}>
+          <a href="/kb" style={{ fontSize: 13, color: "var(--muted)", textDecoration: "none" }}>Knowledge Base builder</a>
+          {messages.length > 0 && (
+            <button
+              onClick={() => setMessages([])}
+              style={{ fontSize: 13, fontWeight: 600, color: "var(--brand-ink)", background: "transparent", border: "none", cursor: "pointer" }}
+            >
+              New
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Conversation */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto", padding: "28px 20px 16px" }}>
+          {messages.length === 0 ? (
+            <Hero onPick={(p, it) => { setIntent(it); setInput(p); setTimeout(grow, 0); taRef.current?.focus(); }} />
+          ) : (
+            <div style={{ display: "grid", gap: 22 }}>
+              {messages.map((m) =>
+                m.role === "user" ? (
+                  <UserBubble key={m.id} m={m} />
+                ) : (
+                  <AssistantTurn key={m.id} m={m} />
+                ),
+              )}
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+      </div>
+
+      {/* Composer */}
+      <div style={{ position: "sticky", bottom: 0, background: "linear-gradient(to top, var(--paper) 70%, transparent)", padding: "10px 20px 18px" }}>
+        <div
+          style={{
+            maxWidth: 860,
+            margin: "0 auto",
+            border: "1px solid var(--line-strong)",
+            borderRadius: "var(--radius)",
+            background: "var(--paper-2)",
+            boxShadow: "var(--shadow-lg)",
+            padding: 12,
+          }}
+        >
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+            <CountrySelect label="Destination" value={destination} options={DESTINATION_OPTIONS} onChange={setDestination} />
+            <CountrySelect label="Citizenship" value={citizenship} options={COUNTRY_OPTIONS} onChange={setCitizenship} />
+            <CountrySelect label="Residence" value={residence} options={COUNTRY_OPTIONS} onChange={setResidence} />
+            <CountrySelect label="Locale" value={locale} options={LOCALE_OPTIONS} onChange={setLocale} />
+          </div>
+          <textarea
+            ref={taRef}
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              grow();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send(input);
+              }
+            }}
+            placeholder="Ask JIJU to create anything for Atlys…"
+            rows={1}
+            style={{
+              width: "100%",
+              border: "none",
+              outline: "none",
+              resize: "none",
+              fontSize: 16,
+              lineHeight: 1.5,
+              fontFamily: "var(--font-body)",
+              background: "transparent",
+              color: "var(--ink)",
+              padding: "4px 4px 8px",
+            }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {INTENTS.map((it) => (
+                <button
+                  key={it.value}
+                  onClick={() => setIntent(it.value)}
+                  style={{
+                    padding: "5px 11px",
+                    borderRadius: 999,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    border: "1px solid",
+                    borderColor: intent === it.value ? "transparent" : "var(--line)",
+                    background: intent === it.value ? "var(--ink)" : "#fff",
+                    color: intent === it.value ? "#fff" : "var(--muted)",
+                  }}
+                >
+                  {it.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => send(input)}
+              disabled={sending || !input.trim()}
+              style={{
+                marginLeft: "auto",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 18px",
+                borderRadius: 999,
+                border: "none",
+                cursor: sending || !input.trim() ? "default" : "pointer",
+                background: "var(--brand)",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 14,
+                opacity: sending || !input.trim() ? 0.5 : 1,
+                boxShadow: sending || !input.trim() ? "none" : "var(--shadow-brand)",
+              }}
+            >
+              {sending ? "Working" : "Create"}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+          </div>
+        </div>
+        <div style={{ maxWidth: 860, margin: "8px auto 0", textAlign: "center", fontSize: 11.5, color: "var(--muted)" }}>
+          JIJU grounds facts on live atlys.com and never uses em or en dashes. Verify figures before publishing.
+        </div>
+      </div>
+    </div>
   );
 }
 
-function FaqCard({
-  index,
-  faq,
-  onChange,
-}: {
-  index: number;
-  faq: FaqItem;
-  onChange: (id: string, patch: Partial<FaqItem>) => void;
-}) {
-  const dash = hasForbiddenDash(faq.question) || hasForbiddenDash(faq.answer);
+function Hero({ onPick }: { onPick: (prompt: string, intent: string) => void }) {
   return (
-    <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <Text weight={700} size={13} color="var(--atlys-muted)">FAQ {index + 1}</Text>
-        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
-          <input
-            type="checkbox"
-            checked={Boolean(faq.approved)}
-            onChange={(e) => onChange(faq.id, { approved: e.target.checked })}
-          />
-          Approved
-        </label>
+    <div className="jiju-rise" style={{ textAlign: "center", padding: "48px 0 24px" }}>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+        <JijuMark size={56} glow />
       </div>
-
-      <Field label="Question">
-        <TextInput value={faq.question} onChange={(v) => onChange(faq.id, { question: v })} />
-      </Field>
-      <div style={{ height: 12 }} />
-      <Field label="Answer">
-        <TextArea value={faq.answer} onChange={(v) => onChange(faq.id, { answer: v })} rows={6} />
-      </Field>
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
-        <Badge tone={dash ? "danger" : "good"}>{dash ? "em/en dash" : "dash-clean"}</Badge>
-        {faq.reviewFlags.map((flag, i) => (
-          <span key={i} title={flag.message}>
-            <Badge tone={FLAG_TONE[flag.kind]}>{flag.kind}</Badge>
-          </span>
-        ))}
-        {faq.targetKeywords.slice(0, 8).map((k) => (
-          <Badge key={k} tone="brand">{k}</Badge>
+      <h1 style={{ fontFamily: "var(--font-display)", fontSize: 40, fontWeight: 800, letterSpacing: "-0.03em", margin: "0 0 10px", lineHeight: 1.05 }}>
+        What should we create?
+      </h1>
+      <p style={{ color: "var(--muted)", fontSize: 16, margin: "0 auto 32px", maxWidth: 520 }}>
+        Ask for anything Atlys needs. FAQs, blogs, or a full knowledge base, grounded on live atlys.com facts and written in the Atlys voice.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, maxWidth: 720, margin: "0 auto" }}>
+        {EXAMPLES.map((ex) => (
+          <button
+            key={ex.title}
+            onClick={() => onPick(ex.prompt, ex.intent)}
+            style={{
+              textAlign: "left",
+              padding: 16,
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--line)",
+              background: "var(--paper-2)",
+              boxShadow: "var(--shadow-sm)",
+              cursor: "pointer",
+              transition: "transform .12s ease, box-shadow .12s ease",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "var(--shadow-md)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "var(--shadow-sm)"; }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 14.5, marginBottom: 3 }}>{ex.title}</div>
+            <div style={{ color: "var(--muted)", fontSize: 13 }}>{ex.sub}</div>
+          </button>
         ))}
       </div>
-    </Card>
+    </div>
+  );
+}
+
+function UserBubble({ m }: { m: Msg }) {
+  const ctx = m.ctx;
+  const ctxLine = ctx
+    ? [labelOf(DESTINATION_OPTIONS, ctx.destination), `${labelOf(COUNTRY_OPTIONS, ctx.citizenship)} → ${labelOf(COUNTRY_OPTIONS, ctx.residence)}`, ctx.intent !== "auto" ? labelOf(INTENTS, ctx.intent) : null]
+        .filter(Boolean)
+        .join("  ·  ")
+    : "";
+  return (
+    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ maxWidth: "82%" }}>
+        <div
+          style={{
+            background: "var(--ink)",
+            color: "#fff",
+            padding: "11px 15px",
+            borderRadius: "16px 16px 4px 16px",
+            fontSize: 15,
+            lineHeight: 1.5,
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {m.text}
+        </div>
+        {ctxLine && (
+          <div style={{ textAlign: "right", fontSize: 11.5, color: "var(--muted)", marginTop: 5 }}>{ctxLine}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AssistantTurn({ m }: { m: Msg }) {
+  if (m.working) {
+    return <WorkingIndicator status={m.status || ""} draft={m.draft || ""} intent={m.intent || ""} />;
+  }
+  return (
+    <div style={{ display: "flex", gap: 12 }}>
+      <JijuMark size={30} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {m.text && <div style={{ fontSize: 15, lineHeight: 1.6, marginBottom: m.artifact ? 14 : 0, paddingTop: 4 }}>{m.text}</div>}
+        {m.artifact?.type === "faqs" && (
+          <FaqArtifact entityName={m.artifact.entityName} faqs={m.artifact.faqs} sourceUrls={m.artifact.sourceUrls} keywordsSource={m.artifact.keywordsSource} />
+        )}
+        {m.artifact?.type === "blog" && <BlogArtifact title={m.artifact.title} markdown={m.artifact.markdown} sourceUrls={m.artifact.sourceUrls} />}
+        {m.artifact?.type === "kb" && <KbArtifact country={m.artifact.country} questions={m.artifact.questions} partial={m.artifact.partial} />}
+        {m.artifact?.type === "markdown" && <MarkdownArtifact markdown={m.artifact.markdown} />}
+      </div>
+    </div>
   );
 }

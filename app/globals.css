@@ -2,47 +2,258 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
-  Atlys design tokens. These are PLACEHOLDER values approximating the Atlys
-  brand. Sync the exact hex / type / spacing values from @atlys/design-system
-  (its styles.css) or via DesignSync once the package is wired. When you import
-  "@atlys/design-system/styles.css" above this block, its variables win.
-*/
+/* ============================================================
+   JIJU — Atlys Content Studio. Premium "travel concierge" theme.
+   ============================================================ */
+
 :root {
-  --atlys-brand-blue: #1f6fff;
-  --atlys-brand-blue-hover: #1559d6;
-  --atlys-black: #0b0b0f;
-  --atlys-red: #e5484d;
-  --atlys-bg: #ffffff;
-  --atlys-surface: #f6f7f9;
-  --atlys-border: #e6e8ec;
-  --atlys-text: #0b0b0f;
-  --atlys-muted: #5b6470;
-  --atlys-radius: 12px;
-  --atlys-radius-sm: 8px;
-  --atlys-shadow: 0 1px 2px rgba(11, 11, 15, 0.06), 0 8px 24px rgba(11, 11, 15, 0.06);
-}
+  --paper: #fbfaf7;
+  --paper-2: #ffffff;
+  --ink: #14171c;
+  --ink-soft: #3a4048;
+  --muted: #6a7280;
+  --line: #eceae3;
+  --line-strong: #e0ddd3;
+  --brand: #1f6fff;
+  --brand-ink: #1550c8;
+  --brand-tint: #eaf1ff;
+  --gold: #e0a23c;
+  --red: #e5484d;
+  --green: #1e7d44;
 
-html,
-body {
-  padding: 0;
-  margin: 0;
-  background: var(--atlys-bg);
-  color: var(--atlys-text);
-}
+  --radius: 16px;
+  --radius-sm: 11px;
+  --radius-pill: 999px;
 
-body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  --shadow-sm: 0 1px 2px rgba(20, 23, 28, 0.04), 0 1px 1px rgba(20, 23, 28, 0.03);
+  --shadow-md: 0 2px 6px rgba(20, 23, 28, 0.05), 0 12px 28px rgba(20, 23, 28, 0.06);
+  --shadow-lg: 0 8px 20px rgba(20, 23, 28, 0.06), 0 30px 60px rgba(20, 23, 28, 0.10);
+  --shadow-brand: 0 8px 22px rgba(31, 111, 255, 0.28);
+
+  --font-body: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  --font-display: var(--font-display, var(--font-body));
+
+  /* Back-compat aliases for older components (ds.tsx). */
+  --atlys-brand-blue: var(--brand);
+  --atlys-brand-blue-hover: var(--brand-ink);
+  --atlys-black: var(--ink);
+  --atlys-red: var(--red);
+  --atlys-bg: var(--paper);
+  --atlys-surface: #f4f2ec;
+  --atlys-border: var(--line);
+  --atlys-text: var(--ink);
+  --atlys-muted: var(--muted);
+  --atlys-radius: var(--radius);
+  --atlys-radius-sm: var(--radius-sm);
+  --atlys-shadow: var(--shadow-md);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Atmosphere: soft brand glow + warm glow + faint dot grid. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(1000px 640px at 88% -8%, rgba(31, 111, 255, 0.10), transparent 60%),
+    radial-gradient(760px 520px at -8% 108%, rgba(224, 162, 60, 0.06), transparent 60%),
+    radial-gradient(circle at 1px 1px, rgba(20, 23, 28, 0.035) 1px, transparent 0) 0 0 / 24px 24px,
+    var(--paper);
+}
+
+/* Fine film grain. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--brand-tint);
+  color: var(--brand-ink);
+}
+
+/* Subtle scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
 @keyframes jiju-spin {
   to {
     transform: rotate(360deg);
   }
+}
+@keyframes jiju-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes jiju-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+}
+@keyframes jiju-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(31, 111, 255, 0.0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(31, 111, 255, 0.08);
+  }
+}
+
+.jiju-rise {
+  animation: jiju-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ============================================================
+   Typeset content (react-markdown output for blogs/freeform).
+   ============================================================ */
+.prose-atlys {
+  color: var(--ink);
+  font-size: 15.5px;
+  line-height: 1.72;
+}
+.prose-atlys > *:first-child {
+  margin-top: 0;
+}
+.prose-atlys h1,
+.prose-atlys h2,
+.prose-atlys h3,
+.prose-atlys h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.prose-atlys h1 {
+  font-size: 1.85em;
+  margin: 0 0 0.5em;
+}
+.prose-atlys h2 {
+  font-size: 1.38em;
+  margin: 1.7em 0 0.5em;
+  padding-top: 0.6em;
+  border-top: 1px solid var(--line);
+}
+.prose-atlys h3 {
+  font-size: 1.12em;
+  margin: 1.3em 0 0.4em;
+}
+.prose-atlys p {
+  margin: 0.7em 0;
+}
+.prose-atlys a {
+  color: var(--brand-ink);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(31, 111, 255, 0.28);
+}
+.prose-atlys a:hover {
+  border-bottom-color: var(--brand-ink);
+}
+.prose-atlys ul,
+.prose-atlys ol {
+  margin: 0.6em 0;
+  padding-left: 1.3em;
+}
+.prose-atlys li {
+  margin: 0.3em 0;
+}
+.prose-atlys blockquote {
+  margin: 1em 0;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--brand);
+  background: var(--brand-tint);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--ink-soft);
+}
+.prose-atlys blockquote p {
+  margin: 0.3em 0;
+}
+.prose-atlys code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.86em;
+  background: #f4f2ec;
+  padding: 0.12em 0.4em;
+  border-radius: 6px;
+}
+.prose-atlys pre {
+  background: #14171c;
+  color: #e8eaf0;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-size: 0.84em;
+  line-height: 1.5;
+}
+.prose-atlys pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.prose-atlys table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.94em;
+  display: block;
+  overflow-x: auto;
+}
+.prose-atlys th,
+.prose-atlys td {
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+  text-align: left;
+}
+.prose-atlys th {
+  background: #f4f2ec;
+  font-weight: 600;
+}
+.prose-atlys hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 1.6em 0;
 }

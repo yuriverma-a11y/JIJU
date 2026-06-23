@@ -22,7 +22,10 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(gh auth *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(curl -s --retry 30 --retry-delay 1 --retry-connrefused -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3215/)",
+      "Bash(curl -s http://localhost:3215/)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST -H 'content-type: application/json' -d '{\"message\":\"draft FAQs for schengen\"}' http://localhost:3215/api/chat)"
     ]
   }
 }

@@ -52,3 +52,33 @@ export async function generateText(opts: {
   });
   return res.choices[0]?.message?.content ?? "";
 }
+
+/**
+ * Streamed completion. Calls onDelta with each token chunk and returns the full
+ * text. Used by the chat so output appears as it is written (perceived speed).
+ * json mode is intentionally NOT used here for max compatibility with streaming;
+ * callers that need JSON instruct it in the prompt and parse the result.
+ */
+export async function streamCompletion(
+  opts: { system: string; prompt: string; maxTokens?: number },
+  onDelta: (text: string) => void,
+): Promise<string> {
+  const stream = await getClient().chat.completions.create({
+    model: CONFIG.kimiModel,
+    max_tokens: opts.maxTokens ?? 8000,
+    stream: true,
+    messages: [
+      { role: "system", content: opts.system },
+      { role: "user", content: opts.prompt },
+    ],
+  });
+  let full = "";
+  for await (const chunk of stream) {
+    const delta = chunk.choices?.[0]?.delta?.content ?? "";
+    if (delta) {
+      full += delta;
+      onDelta(delta);
+    }
+  }
+  return full;
+}

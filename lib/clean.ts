@@ -63,6 +63,28 @@ export function stripDashes(input: string): string {
   return t;
 }
 
+/** True if any em/en dash (unicode) remains. Hyphens and "--" are allowed (markdown). */
+export function hasEmEnDash(text: string): boolean {
+  return DASH_RE.test(text);
+}
+
+/**
+ * Markdown-safe dash cleanup: removes only unicode em/en dashes, preserving
+ * ASCII hyphens and "---" (markdown rules, YAML frontmatter, list markers).
+ * Use for blog/freeform Markdown; use stripDashes() for FAQ prose.
+ */
+export function stripEmEnDashes(input: string): string {
+  let t = input;
+  const rangeRe = new RegExp(
+    `(\\p{Sc}?\\s?\\d[\\d.,]*)\\s*[${DASH_CLASS}]\\s*(\\p{Sc}?\\s?\\d[\\d.,]*)`,
+    "gu",
+  );
+  t = t.replace(rangeRe, "$1 to $2");
+  t = t.replace(new RegExp(`\\s*[${DASH_CLASS}]\\s*`, "g"), ", ");
+  t = t.replace(/ +,/g, ",").replace(/,\s*,+/g, ",");
+  return t;
+}
+
 // Common "AI tell" phrases that make copy read as machine-written.
 const AI_TELLS: RegExp[] = [
   /\bin today'?s (?:fast[- ]paced |digital )?world\b/i,
