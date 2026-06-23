@@ -20,6 +20,16 @@ import type { KbDataset, KbQuestion } from "@/lib/kb-types";
 // How many KB slices to expand at once (independent LLM requests).
 const KB_CONCURRENCY = 4;
 
+// Sensible starter selection so the page is not pre-filled with everything.
+const DEFAULT_VISA_TYPES = ["Tourist"];
+const DEFAULT_CATEGORIES = [
+  "Eligibility",
+  "Required documents",
+  "Fees and payment",
+  "Processing time",
+  "Rejection, refusal and reapplication",
+];
+
 const DESTINATION_OPTIONS = [
   ...GROUPS.map((g) => ({ value: g.id, label: `${g.name} (group)` })),
   ...WORLD_COUNTRIES.map((c) => ({ value: c.iso2, label: c.name })),
@@ -94,8 +104,10 @@ export default function KbPage() {
   const [citizenship, setCitizenship] = useState("IN");
   const [residence, setResidence] = useState("AE");
   const [targetCount, setTargetCount] = useState(500);
-  const [visaTypes, setVisaTypes] = useState<string[]>([...VISA_TYPES]);
-  const [categories, setCategories] = useState<string[]>([...CATEGORIES]);
+  // Start with a focused, common selection rather than everything (which is
+  // overwhelming). Users can expand with the "all" toggles.
+  const [visaTypes, setVisaTypes] = useState<string[]>([...DEFAULT_VISA_TYPES]);
+  const [categories, setCategories] = useState<string[]>([...DEFAULT_CATEGORIES]);
 
   const [running, setRunning] = useState(false);
   const [questions, setQuestions] = useState<KbQuestion[]>([]);
