@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Semrush_MCP__keyword_research",
+      "WebSearch",
+      "mcp__claude_ai_atlys_design_system__get-documentation",
+      "Bash(npm -v)",
+      "Bash(npm install *)",
+      "Bash(npm test *)",
+      "Bash(npm run *)",
+      "Bash(curl -s --retry 30 --retry-delay 1 --retry-connrefused -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST -H 'content-type: application/json' -d '{\"target\":\"schengen\",\"applyingFrom\":\"IN\"}' http://localhost:3210/api/keywords)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST -H 'content-type: application/json' -d '{\"target\":\"FR\",\"applyingFrom\":\"IN\",\"count\":3}' http://localhost:3210/api/generate)",
+      "Bash(curl -sL -A 'Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/120.0.0.0 Safari/537.36' -H 'accept: text/html' https://www.atlys.com/en-US/visa/schengen -o /private/tmp/claude-501/-Users-yuriv-Desktop-internal/9feec51d-4a7b-4952-987d-9aa96b1b6062/scratchpad/clp.html)",
+      "Bash(node -e ' *)",
+      "Bash(pkill -f \"next start\")",
+      "Bash(npm uninstall *)",
+      "Bash(node -e \"console.log\\('openai version:', require\\('openai/package.json'\\).version\\)\")",
+      "Bash(npm ls *)",
+      "Bash(git --version)",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(gh auth *)"
+    ]
+  }
+}
