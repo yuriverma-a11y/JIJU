@@ -60,7 +60,7 @@ export async function POST(req: Request) {
       count: body.count,
       avoid: body.avoid,
     });
-    const raw = await generateJson({ system: KB_SYSTEM, prompt, maxTokens: 4000, temperature: 0.8 });
+    const raw = await generateJson({ system: KB_SYSTEM, prompt, maxTokens: 4000 });
     const parsed = QuestionsZ.parse(safeJson(raw));
     const questions = parsed.questions
       .map((q) => stripDashes(q).trim())
