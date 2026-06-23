@@ -101,6 +101,9 @@ export async function runChatStream(
   if (override) {
     intent = override;
     topic = opts.message;
+    // Respect an explicit count in the message (e.g. "give me 5 faqs").
+    const numMatch = opts.message.match(/\b(\d{1,3})\b/);
+    if (numMatch) count = parseInt(numMatch[1], 10);
   } else {
     const r = await classifyIntent({
       message: opts.message,
