@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Plus_Jakarta_Sans } from "next/font/google";
+import { Bricolage_Grotesque, Fraunces, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+
+// Editorial serif for hero/display moments.
+const serif = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "900"],
+  style: ["normal", "italic"],
+  variable: "--font-serif",
+  display: "swap",
+});
 
 const display = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -28,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html lang="en" className={`${serif.variable} ${display.variable} ${body.variable}`}>
       <body>{children}</body>
     </html>
   );

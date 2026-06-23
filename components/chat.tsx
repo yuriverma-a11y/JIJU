@@ -108,6 +108,21 @@ export function WorkingIndicator({
           {status || "Thinking"}
           <Dots />
         </div>
+        {/* In-flight progress line */}
+        <div style={{ position: "relative", height: 16, marginTop: 8, maxWidth: 260 }}>
+          <div
+            className="jiju-perforate"
+            style={{ position: "absolute", top: 7, left: 6, right: 6, height: 2, opacity: 0.7 }}
+          />
+          <span style={{ position: "absolute", top: 3, left: 0, width: 8, height: 8, borderRadius: 999, background: "var(--gold)" }} />
+          <span style={{ position: "absolute", top: 3, right: 0, width: 8, height: 8, borderRadius: 999, border: "2px solid var(--brand)", background: "#fff" }} />
+          <svg
+            width="16" height="16" viewBox="0 0 24 24" fill="none"
+            style={{ position: "absolute", top: 0, left: 0, color: "var(--brand)", animation: "jiju-fly 2.4s ease-in-out infinite", offsetPath: "path('M 4 8 L 248 8')" } as React.CSSProperties}
+          >
+            <path d="M2 12l19-8-7 8 7 8-19-8z" fill="currentColor" />
+          </svg>
+        </div>
         {showProse && (
           <div
             className="prose-atlys"
@@ -166,23 +181,38 @@ export function CountrySelect({
         onClick={() => setOpen((o) => !o)}
         style={{
           display: "inline-flex",
-          alignItems: "center",
-          gap: 7,
-          padding: "7px 12px",
-          borderRadius: 999,
-          border: "1px solid var(--line)",
-          background: open ? "var(--brand-tint)" : "#fff",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: 1,
+          padding: "6px 12px",
+          borderRadius: 10,
+          border: "1px solid",
+          borderColor: open ? "var(--brand)" : "var(--line-strong)",
+          background: open ? "var(--brand-tint)" : "rgba(255,255,255,0.7)",
           cursor: "pointer",
-          fontSize: 13,
           color: "var(--ink)",
           maxWidth: "100%",
+          transition: "border-color .15s ease, background .15s ease",
         }}
       >
-        <span style={{ color: "var(--muted)" }}>{label}</span>
-        <strong style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>
-          {current?.label ?? "Select"}
-        </strong>
-        <span style={{ color: "var(--muted)", fontSize: 10 }}>{open ? "▲" : "▼"}</span>
+        <span
+          style={{
+            fontSize: 9.5,
+            fontWeight: 700,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: "var(--muted)",
+            fontFamily: "var(--font-display)",
+          }}
+        >
+          {label}
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <strong style={{ fontWeight: 700, fontSize: 13.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 124 }}>
+            {current?.label ?? "Select"}
+          </strong>
+          <span style={{ color: open ? "var(--brand)" : "var(--muted)", fontSize: 9 }}>{open ? "▲" : "▼"}</span>
+        </span>
       </button>
       {open && (
         <>
@@ -298,24 +328,29 @@ function ArtifactShell({
     <div
       className="jiju-rise"
       style={{
-        border: "1px solid var(--line)",
+        border: "1px solid var(--line-strong)",
         borderRadius: "var(--radius)",
         background: "var(--paper-2)",
         boxShadow: "var(--shadow-md)",
         overflow: "hidden",
       }}
     >
+      {/* Ticket-stub accent strip */}
+      <div style={{ height: 4, background: "linear-gradient(90deg, var(--brand), var(--sky) 55%, var(--gold))" }} />
       <div
         style={{
-          padding: "13px 18px",
+          padding: "12px 18px",
           borderBottom: "1px solid var(--line)",
           display: "flex",
           alignItems: "center",
           gap: 10,
           flexWrap: "wrap",
-          background: "#fcfbf8",
+          background: "#fcfbf6",
         }}
       >
+        <span style={{ display: "inline-grid", placeItems: "center", width: 24, height: 24, borderRadius: 7, background: "var(--brand-tint)", color: "var(--brand-ink)", flex: "0 0 auto" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M10.2 13.8 3 12l18-7-4 18-3.5-6.3" /><path d="m13.5 16.7-3.3-2.9" /></svg>
+        </span>
         <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15 }}>{title}</span>
         {meta}
       </div>

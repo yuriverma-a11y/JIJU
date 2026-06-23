@@ -55,8 +55,49 @@ export const FAQ_OUTPUT_SCHEMA = {
 } as const;
 
 /**
+ * Repair a JSON string that was cut off mid-stream (the usual cause of
+ * "Unexpected end of JSON input"). Walks the text tracking string/escape state
+ * and the bracket stack, drops any dangling trailing token, closes an open
+ * string, and appends the missing closing brackets so JSON.parse can succeed.
+ */
+function repairTruncatedJson(input: string): string {
+  let out = "";
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    out += ch;
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") stack.push("}");
+    else if (ch === "[") stack.push("]");
+    else if (ch === "}" || ch === "]") stack.pop();
+  }
+
+  // If we ended inside a string, close it.
+  if (inString) out += '"';
+
+  // Drop a trailing comma or a dangling "key": with no value yet.
+  out = out.replace(/,\s*$/, "");
+  out = out.replace(/:\s*$/, ": null");
+  out = out.replace(/,\s*$/, "");
+
+  // Close any still-open brackets in reverse order.
+  while (stack.length) out += stack.pop();
+  return out;
+}
+
+/**
  * Best-effort extraction of a JSON object from model text that may be wrapped
- * in prose or ```json fences. Returns the parsed value or throws.
+ * in prose or ```json fences, and may be truncated. Returns the parsed value
+ * or throws if even the repaired text is unparseable.
  */
 export function parseJsonLoose(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -65,5 +106,11 @@ export function parseJsonLoose(text: string): unknown {
   const start = candidate.indexOf("{");
   const end = candidate.lastIndexOf("}");
   const slice = start >= 0 && end > start ? candidate.slice(start, end + 1) : candidate;
-  return JSON.parse(slice);
+  try {
+    return JSON.parse(slice);
+  } catch {
+    // Likely truncated output: keep from the first "{" and repair the tail.
+    const fromStart = start >= 0 ? candidate.slice(start) : candidate;
+    return JSON.parse(repairTruncatedJson(fromStart));
+  }
 }

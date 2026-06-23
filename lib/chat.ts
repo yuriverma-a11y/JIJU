@@ -19,7 +19,8 @@ import { KB_SYSTEM, buildKbExpandPrompt } from "./kb-prompts";
 import { generateJson, streamCompletion } from "./llm";
 import { BRAND_VOICE_SYSTEM, buildFaqPrompt } from "./prompts";
 import { classifyIntent } from "./router";
-import { FaqResponseZ, parseJsonLoose } from "./schemas";
+import { parseJsonLoose } from "./schemas";
+import { z } from "zod";
 import { researchKeywords } from "./semrush";
 import type { ChatIntent, ChatStreamEvent } from "./chat-types";
 import type { AtlysFact, FaqItem, KeywordCluster } from "./types";
@@ -33,6 +34,36 @@ function safeJson(text: string): unknown {
   } catch {
     return parseJsonLoose(text);
   }
+}
+
+const FaqItemZ = z.object({
+  question: z.string(),
+  answer: z.string(),
+  targetKeywords: z.array(z.string()).default([]),
+  factsUsed: z.array(z.string()).default([]),
+});
+
+/**
+ * Tolerant FAQ parse: extract the JSON object (repairing truncated output if
+ * needed), then keep only the items that are complete and valid. A cut-off
+ * trailing item is dropped rather than failing the whole batch. Returns null
+ * if nothing parseable was found.
+ */
+function parseFaqs(raw: string): { faqs: z.infer<typeof FaqItemZ>[] } | null {
+  let obj: unknown;
+  try {
+    obj = safeJson(raw);
+  } catch {
+    return null;
+  }
+  const arr = (obj as { faqs?: unknown })?.faqs;
+  if (!Array.isArray(arr)) return null;
+  const faqs = arr
+    .map((item) => FaqItemZ.safeParse(item))
+    .filter((r): r is { success: true; data: z.infer<typeof FaqItemZ> } => r.success)
+    .map((r) => r.data)
+    .filter((f) => f.question.trim() && f.answer.trim());
+  return { faqs };
 }
 
 function extractH1(markdown: string): string {
@@ -119,7 +150,22 @@ export async function runChatStream(
       { system: BRAND_VOICE_SYSTEM, prompt, maxTokens: 8000 },
       (d) => emit({ type: "delta", text: d }),
     );
-    const parsed = FaqResponseZ.parse(safeJson(raw));
+    // Parse the streamed output; if it was truncated or malformed, fall back to
+    // a non-streamed JSON-mode generation that reliably returns valid JSON.
+    let parsed = parseFaqs(raw);
+    if (!parsed || parsed.faqs.length === 0) {
+      emit({ type: "status", text: "Finalizing FAQs" });
+      const jsonRaw = await generateJson({
+        system: BRAND_VOICE_SYSTEM,
+        prompt: `${prompt}\n\nReturn ONLY a JSON object: {"faqs":[{"question","answer","targetKeywords":[],"factsUsed":[]}]}.`,
+        maxTokens: 8000,
+      });
+      parsed = parseFaqs(jsonRaw);
+    }
+    if (!parsed || parsed.faqs.length === 0) {
+      emit({ type: "error", error: "Could not generate FAQs. Please try again." });
+      return;
+    }
     const faqs: FaqItem[] = parsed.faqs.map((f, i) => {
       const question = cleanAnswer(f.question);
       const answer = cleanAnswer(f.answer);

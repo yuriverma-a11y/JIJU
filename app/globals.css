@@ -7,31 +7,37 @@
    ============================================================ */
 
 :root {
-  --paper: #fbfaf7;
-  --paper-2: #ffffff;
-  --ink: #14171c;
-  --ink-soft: #3a4048;
-  --muted: #6a7280;
-  --line: #eceae3;
-  --line-strong: #e0ddd3;
+  /* Warm "departures lounge" ivory + deep navy ink. */
+  --paper: #f7f3ea;
+  --paper-2: #fffdf7;
+  --ink: #111a2e;
+  --ink-soft: #3a4863;
+  --muted: #6b7689;
+  --line: #e9e2d2;
+  --line-strong: #dcd3bd;
   --brand: #1f6fff;
   --brand-ink: #1550c8;
-  --brand-tint: #eaf1ff;
-  --gold: #e0a23c;
+  --brand-tint: #e8f0ff;
+  --sky: #1f97d8;
+  --gold: #c08524;        /* passport-stamp amber */
+  --gold-soft: #e6b65f;
+  --stamp: #b4452f;       /* travel ink-stamp red */
   --red: #e5484d;
   --green: #1e7d44;
 
-  --radius: 16px;
-  --radius-sm: 11px;
+  --radius: 18px;
+  --radius-sm: 12px;
   --radius-pill: 999px;
 
-  --shadow-sm: 0 1px 2px rgba(20, 23, 28, 0.04), 0 1px 1px rgba(20, 23, 28, 0.03);
-  --shadow-md: 0 2px 6px rgba(20, 23, 28, 0.05), 0 12px 28px rgba(20, 23, 28, 0.06);
-  --shadow-lg: 0 8px 20px rgba(20, 23, 28, 0.06), 0 30px 60px rgba(20, 23, 28, 0.10);
-  --shadow-brand: 0 8px 22px rgba(31, 111, 255, 0.28);
+  --shadow-sm: 0 1px 2px rgba(17, 26, 46, 0.05), 0 1px 1px rgba(17, 26, 46, 0.03);
+  --shadow-md: 0 2px 8px rgba(17, 26, 46, 0.06), 0 14px 30px rgba(17, 26, 46, 0.07);
+  --shadow-lg: 0 10px 24px rgba(17, 26, 46, 0.08), 0 36px 70px rgba(17, 26, 46, 0.13);
+  --shadow-brand: 0 10px 26px rgba(31, 111, 255, 0.30);
+  --shadow-gold: 0 8px 22px rgba(192, 133, 36, 0.28);
 
   --font-body: var(--font-body, ui-sans-serif, system-ui, sans-serif);
   --font-display: var(--font-display, var(--font-body));
+  --font-serif: var(--font-serif, Georgia, "Times New Roman", serif);
 
   /* Back-compat aliases for older components (ds.tsx). */
   --atlys-brand-blue: var(--brand);
@@ -39,7 +45,7 @@
   --atlys-black: var(--ink);
   --atlys-red: var(--red);
   --atlys-bg: var(--paper);
-  --atlys-surface: #f4f2ec;
+  --atlys-surface: #f1ece0;
   --atlys-border: var(--line);
   --atlys-text: var(--ink);
   --atlys-muted: var(--muted);
@@ -63,27 +69,29 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Atmosphere: soft brand glow + warm glow + faint dot grid. */
+/* Atmosphere: sky glow at top, warm amber glow at base, and a faint dotted
+   world-map grid that reads like a longitude/latitude chart. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -2;
   background:
-    radial-gradient(1000px 640px at 88% -8%, rgba(31, 111, 255, 0.10), transparent 60%),
-    radial-gradient(760px 520px at -8% 108%, rgba(224, 162, 60, 0.06), transparent 60%),
-    radial-gradient(circle at 1px 1px, rgba(20, 23, 28, 0.035) 1px, transparent 0) 0 0 / 24px 24px,
+    radial-gradient(1100px 680px at 86% -12%, rgba(31, 111, 255, 0.13), transparent 58%),
+    radial-gradient(820px 560px at -10% 112%, rgba(192, 133, 36, 0.10), transparent 60%),
+    radial-gradient(560px 420px at 50% 50%, rgba(31, 151, 216, 0.05), transparent 70%),
+    radial-gradient(circle at 1px 1px, rgba(17, 26, 46, 0.05) 1px, transparent 0) 0 0 / 26px 26px,
     var(--paper);
 }
 
-/* Fine film grain. */
+/* Fine film grain + a single ghosted great-circle arc sweeping the page. */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.04;
+  opacity: 0.05;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -144,8 +152,130 @@ body::after {
   }
 }
 
+/* The plane glides along the great-circle arc and loops. */
+@keyframes jiju-fly {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* Dashed route draws itself in. */
+@keyframes jiju-draw {
+  from {
+    stroke-dashoffset: 520;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* The wax/passport stamp presses in, slightly overshooting. Resting state
+   (rotate -9 / scale 1) stays visible even if the animation never runs. */
+@keyframes jiju-stamp {
+  0% {
+    transform: rotate(-17deg) scale(1.55);
+  }
+  60% {
+    transform: rotate(-9deg) scale(0.93);
+  }
+  80% {
+    transform: rotate(-9deg) scale(1.03);
+  }
+  100% {
+    transform: rotate(-9deg) scale(1);
+  }
+}
+
+/* Slow continuous rotation for the stamp ring text. */
+@keyframes jiju-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A soft sheen swept across surfaces. */
+@keyframes jiju-sheen {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+/* Gentle bob for floating travel glyphs. */
+@keyframes jiju-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--rot, 0deg));
+  }
+  50% {
+    transform: translateY(-7px) rotate(var(--rot, 0deg));
+  }
+}
+
 .jiju-rise {
-  animation: jiju-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: jiju-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Staggered reveals for hero children. */
+.jiju-stagger > * {
+  animation: jiju-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.jiju-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.jiju-stagger > *:nth-child(2) { animation-delay: 0.10s; }
+.jiju-stagger > *:nth-child(3) { animation-delay: 0.18s; }
+.jiju-stagger > *:nth-child(4) { animation-delay: 0.26s; }
+.jiju-stagger > *:nth-child(5) { animation-delay: 0.34s; }
+
+/* Perforated boarding-pass divider. */
+.jiju-perforate {
+  background-image: radial-gradient(circle, var(--line-strong) 1.4px, transparent 1.6px);
+  background-size: 9px 100%;
+  background-repeat: repeat-x;
+  background-position: center;
+}
+
+/* Dashed ticket stub edge. */
+.jiju-ticket {
+  position: relative;
+}
+.jiju-ticket::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(140deg, rgba(31, 111, 255, 0.35), rgba(192, 133, 36, 0.28));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.jiju-ticket:hover::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 /* ============================================================

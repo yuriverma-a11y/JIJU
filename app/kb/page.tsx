@@ -1,20 +1,13 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { JijuMark } from "@/components/chat";
+import { AtlysLogo, TravelIcon } from "@/components/brand";
+import { Badge, Button, Field, Select, Spinner, Text, TextInput } from "@/components/ds";
 import {
-  Badge,
-  Button,
-  Card,
-  Field,
-  Select,
-  Spinner,
-  Text,
-  TextInput,
-} from "@/components/ds";
-import {
-  COUNTRIES,
   GROUPS,
   WORLD_COUNTRIES,
+  countryName as isoName,
   entityDisplayName,
   resolveEntity,
 } from "@/lib/countries";
@@ -25,9 +18,57 @@ import type { KbDataset, KbQuestion } from "@/lib/kb-types";
 
 const DESTINATION_OPTIONS = [
   ...GROUPS.map((g) => ({ value: g.id, label: `${g.name} (group)` })),
-  ...COUNTRIES.map((c) => ({ value: c.iso2, label: c.name })),
+  ...WORLD_COUNTRIES.map((c) => ({ value: c.iso2, label: c.name })),
 ];
 const COUNTRY_OPTIONS = WORLD_COUNTRIES.map((c) => ({ value: c.iso2, label: c.name }));
+
+/* ------------------------------- panel ---------------------------------- */
+
+function Panel({
+  label,
+  icon,
+  children,
+  style,
+}: {
+  label?: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div
+      style={{
+        border: "1px solid var(--line-strong)",
+        borderRadius: "var(--radius)",
+        background: "var(--paper-2)",
+        boxShadow: "var(--shadow-sm)",
+        overflow: "hidden",
+        ...style,
+      }}
+    >
+      <div style={{ height: 4, background: "linear-gradient(90deg, var(--brand), var(--sky) 55%, var(--gold))" }} />
+      {label && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "11px 18px",
+            borderBottom: "1px solid var(--line)",
+            background: "#fcfbf6",
+            color: "var(--ink-soft)",
+          }}
+        >
+          {icon}
+          <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase" }}>
+            {label}
+          </span>
+        </div>
+      )}
+      <div style={{ padding: 18 }}>{children}</div>
+    </div>
+  );
+}
 
 export default function KbPage() {
   const [destination, setDestination] = useState("schengen");
@@ -169,117 +210,198 @@ export default function KbPage() {
   const pct = progress.total > 0 ? Math.round((progress.slice / progress.total) * 100) : 0;
 
   return (
-    <main style={{ maxWidth: 1040, margin: "0 auto", padding: "40px 24px 80px" }}>
-      <header style={{ marginBottom: 24 }}>
-        <a href="/" style={{ fontSize: 13, color: "var(--atlys-brand-blue)" }}>← FAQs</a>
-        <Text as="h1" size={30} weight={800} style={{ marginTop: 8 }}>Knowledge Base</Text>
-        <Text color="var(--atlys-muted)" style={{ marginTop: 6 }}>
-          Exhaustive question bank per country, for a global audience. Choose how many and what to include, then export Markdown + JSON for the agent.
-        </Text>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 30,
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          padding: "13px 22px",
+          borderBottom: "1px solid var(--line)",
+          background: "rgba(247,243,234,0.78)",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <JijuMark size={32} />
+        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
+            <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 20, letterSpacing: "-0.03em" }}>JIJU</span>
+            <span style={{ fontSize: 11, color: "var(--muted)", letterSpacing: "0.04em" }}>Content Studio</span>
+          </div>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 5, fontSize: 10.5, color: "var(--muted)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            by <AtlysLogo height={13} />
+          </span>
+        </div>
+        <div style={{ marginLeft: "auto" }}>
+          <a href="/" style={{ fontSize: 13, fontWeight: 600, color: "var(--brand-ink)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <TravelIcon name="plane" size={15} /> Back to Studio
+          </a>
+        </div>
       </header>
 
-      <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 16 }}>
-          <Field label="Destination">
-            <Select value={destination} onChange={setDestination} options={DESTINATION_OPTIONS} />
-          </Field>
-          <Field label="Citizenship">
-            <Select value={citizenship} onChange={setCitizenship} options={COUNTRY_OPTIONS} />
-          </Field>
-          <Field label="Residence">
-            <Select value={residence} onChange={setResidence} options={COUNTRY_OPTIONS} />
-          </Field>
-          <Field label="How many questions" hint="Stops once reached">
-            <TextInput
-              type="number"
-              value={String(targetCount)}
-              onChange={(v) => setTargetCount(Math.max(50, Math.min(5000, Number(v) || 50)))}
-            />
-          </Field>
+      <main style={{ flex: 1, maxWidth: 1040, width: "100%", margin: "0 auto", padding: "28px 24px 80px" }}>
+        {/* Dossier hero */}
+        <div
+          className="jiju-rise"
+          style={{
+            position: "relative",
+            display: "flex",
+            gap: 22,
+            alignItems: "center",
+            border: "1px solid var(--line-strong)",
+            borderRadius: "var(--radius)",
+            background: "linear-gradient(105deg, var(--ink), #1c2a45)",
+            color: "#fff",
+            padding: "26px 28px",
+            overflow: "hidden",
+            boxShadow: "var(--shadow-md)",
+            marginBottom: 22,
+          }}
+        >
+          {/* faint dotted globe in the corner */}
+          <div aria-hidden style={{ position: "absolute", right: -40, top: -40, opacity: 0.14, color: "#fff" }}>
+            <TravelIcon name="globe" size={200} />
+          </div>
+          <div
+            style={{
+              flex: "0 0 auto",
+              width: 64,
+              height: 64,
+              borderRadius: 16,
+              background: "rgba(255,255,255,0.12)",
+              border: "1px solid rgba(255,255,255,0.22)",
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <TravelIcon name="passport" size={34} />
+          </div>
+          <div style={{ position: "relative" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--gold-soft)", marginBottom: 8 }}>
+              <TravelIcon name="stamp" size={13} /> Field Dossier
+            </div>
+            <h1 style={{ fontFamily: "var(--font-serif)", fontWeight: 600, fontSize: 34, letterSpacing: "-0.02em", margin: "0 0 8px", lineHeight: 1.05 }}>
+              Knowledge Base builder
+            </h1>
+            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: "rgba(255,255,255,0.74)", maxWidth: 560 }}>
+              An exhaustive question bank per destination, for a global audience. Choose how many and what to include, then export Markdown plus JSON for the agent.
+            </p>
+          </div>
         </div>
-      </Card>
 
-      <Card style={{ marginBottom: 16 }}>
-        <ChipGroup
-          label="Visa types to include"
-          all={VISA_TYPES}
-          selected={visaTypes}
-          onToggle={(v) => toggle(visaTypes, setVisaTypes, v)}
-          onAll={() => setVisaTypes([...VISA_TYPES])}
-          onNone={() => setVisaTypes([])}
-        />
-        <div style={{ height: 16 }} />
-        <ChipGroup
-          label="Topics to include"
-          all={CATEGORIES}
-          selected={categories}
-          onToggle={(c) => toggle(categories, setCategories, c)}
-          onAll={() => setCategories([...CATEGORIES])}
-          onNone={() => setCategories([])}
-        />
-        <div style={{ marginTop: 18, display: "flex", gap: 10, alignItems: "center" }}>
-          <Button onClick={build} loading={running} disabled={!canBuild}>
-            {running ? "Building" : "Build knowledge base"}
-          </Button>
-          {running && (
-            <Button variant="secondary" color="red" onClick={() => (stopRef.current = true)}>Stop</Button>
-          )}
-          <Text color="var(--atlys-muted)" style={{ fontSize: 12 }}>
-            {visaTypes.length} visa types × {categories.length} topics
-          </Text>
-        </div>
-      </Card>
+        {/* Itinerary: destination + audience */}
+        <Panel label="Itinerary" icon={<TravelIcon name="compass" size={15} />} style={{ marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 16 }}>
+            <Field label="Destination">
+              <Select value={destination} onChange={setDestination} options={DESTINATION_OPTIONS} />
+            </Field>
+            <Field label="Citizenship">
+              <Select value={citizenship} onChange={setCitizenship} options={COUNTRY_OPTIONS} />
+            </Field>
+            <Field label="Residence">
+              <Select value={residence} onChange={setResidence} options={COUNTRY_OPTIONS} />
+            </Field>
+            <Field label="How many questions" hint="Stops once reached">
+              <TextInput
+                type="number"
+                value={String(targetCount)}
+                onChange={(v) => setTargetCount(Math.max(50, Math.min(5000, Number(v) || 50)))}
+              />
+            </Field>
+          </div>
+          <div style={{ marginTop: 16, display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 999, background: "var(--brand-tint)", color: "var(--brand-ink)", fontSize: 13, fontWeight: 600 }}>
+            <strong>{countryName}</strong>
+            <span style={{ opacity: 0.55 }}>·</span>
+            <span>{isoName(citizenship)}</span>
+            <TravelIcon name="plane" size={14} />
+            <span>{isoName(residence)}</span>
+          </div>
+        </Panel>
 
-      {(running || questions.length > 0) && (
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            {running && <Spinner size={16} />}
-            <Text weight={700}>{questions.length} questions</Text>
+        {/* Manifest: what to include */}
+        <Panel label="Manifest" icon={<TravelIcon name="ticket" size={15} />} style={{ marginBottom: 16 }}>
+          <ChipGroup
+            label="Visa types to include"
+            all={VISA_TYPES}
+            selected={visaTypes}
+            onToggle={(v) => toggle(visaTypes, setVisaTypes, v)}
+            onAll={() => setVisaTypes([...VISA_TYPES])}
+            onNone={() => setVisaTypes([])}
+          />
+          <div style={{ height: 18 }} />
+          <ChipGroup
+            label="Topics to include"
+            all={CATEGORIES}
+            selected={categories}
+            onToggle={(c) => toggle(categories, setCategories, c)}
+            onAll={() => setCategories([...CATEGORIES])}
+            onNone={() => setCategories([])}
+          />
+          <div style={{ marginTop: 20, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Button onClick={build} loading={running} disabled={!canBuild}>
+              {running ? "Building" : "Build knowledge base"}
+            </Button>
             {running && (
-              <Text color="var(--atlys-muted)" style={{ fontSize: 13 }}>slice {progress.slice}/{progress.total}</Text>
+              <Button variant="secondary" color="red" onClick={() => (stopRef.current = true)}>Stop</Button>
             )}
-            <div style={{ flex: 1, minWidth: 120, height: 6, background: "var(--atlys-surface)", borderRadius: 999, overflow: "hidden" }}>
-              <div style={{ width: `${running ? pct : 100}%`, height: "100%", background: "var(--atlys-brand-blue)" }} />
-            </div>
+            <Text color="var(--muted)" style={{ fontSize: 12 }}>
+              {visaTypes.length} visa types × {categories.length} topics
+            </Text>
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
-            {Object.entries(counts).map(([vt, n]) => (
-              <Badge key={vt} tone="neutral">{vt}: {n}</Badge>
-            ))}
-          </div>
-          {questions.length > 0 && (
-            <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
-              <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(toKbMarkdown(dataset)); flash("Markdown copied"); }}>Copy Markdown</Button>
-              <Button size="sm" onClick={() => download("md")}>Download .md</Button>
-              <Button size="sm" onClick={() => download("json")}>Download .json</Button>
-              {toast && <Badge tone="good">{toast}</Badge>}
+        </Panel>
+
+        {(running || questions.length > 0) && (
+          <Panel label="Boarding status" icon={<TravelIcon name="stamp" size={15} />} style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              {running && <Spinner size={16} />}
+              <Text weight={700}>{questions.length} questions</Text>
+              {running && (
+                <Text color="var(--muted)" style={{ fontSize: 13 }}>slice {progress.slice}/{progress.total}</Text>
+              )}
+              <div className="jiju-perforate" style={{ flex: 1, minWidth: 120, height: 6, borderRadius: 999, overflow: "hidden", background: "var(--atlys-surface)", backgroundImage: "none" }}>
+                <div style={{ width: `${running ? pct : 100}%`, height: "100%", background: "linear-gradient(90deg, var(--brand), var(--sky))", transition: "width .3s ease" }} />
+              </div>
             </div>
-          )}
-        </Card>
-      )}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
+              {Object.entries(counts).map(([vt, n]) => (
+                <Badge key={vt} tone="neutral">{vt}: {n}</Badge>
+              ))}
+            </div>
+            {questions.length > 0 && (
+              <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
+                <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(toKbMarkdown(dataset)); flash("Markdown copied"); }}>Copy Markdown</Button>
+                <Button size="sm" onClick={() => download("md")}>Download .md</Button>
+                <Button size="sm" onClick={() => download("json")}>Download .json</Button>
+                {toast && <Badge tone="good">{toast}</Badge>}
+              </div>
+            )}
+          </Panel>
+        )}
 
-      {error && (
-        <Card style={{ marginBottom: 16, borderColor: "var(--atlys-red)" }}>
-          <Text color="var(--atlys-red)" style={{ fontSize: 14 }}>{error}</Text>
-        </Card>
-      )}
+        {error && (
+          <Panel style={{ marginBottom: 16, borderColor: "var(--red)" }}>
+            <Text color="var(--red)" style={{ fontSize: 14 }}>{error}</Text>
+          </Panel>
+        )}
 
-      {questions.length > 0 && (
-        <Card>
-          <Text weight={700} size={14} style={{ marginBottom: 10 }}>
-            Sample (first 50 of {questions.length})
-          </Text>
-          <ol style={{ margin: 0, paddingLeft: 20, color: "var(--atlys-text)", fontSize: 14, lineHeight: 1.7 }}>
-            {questions.slice(0, 50).map((q) => (
-              <li key={q.id}>
-                {q.question}{" "}
-                <span style={{ color: "var(--atlys-muted)", fontSize: 12 }}>({q.visaType} · {q.category})</span>
-              </li>
-            ))}
-          </ol>
-        </Card>
-      )}
-    </main>
+        {questions.length > 0 && (
+          <Panel label={`Manifest preview · first 50 of ${questions.length}`} icon={<TravelIcon name="passport" size={15} />}>
+            <ol style={{ margin: 0, paddingLeft: 20, color: "var(--ink)", fontSize: 14, lineHeight: 1.75 }}>
+              {questions.slice(0, 50).map((q) => (
+                <li key={q.id}>
+                  {q.question}{" "}
+                  <span style={{ color: "var(--muted)", fontSize: 12 }}>({q.visaType} · {q.category})</span>
+                </li>
+              ))}
+            </ol>
+          </Panel>
+        )}
+      </main>
+    </div>
   );
 }
 
@@ -313,15 +435,16 @@ function ChipGroup({
               key={item}
               onClick={() => onToggle(item)}
               style={{
-                padding: "4px 10px",
+                padding: "5px 11px",
                 borderRadius: 999,
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
                 border: "1px solid",
-                borderColor: on ? "var(--atlys-brand-blue)" : "var(--atlys-border)",
-                background: on ? "#EAF1FF" : "#fff",
-                color: on ? "var(--atlys-brand-blue)" : "var(--atlys-muted)",
+                borderColor: on ? "var(--brand)" : "var(--line-strong)",
+                background: on ? "var(--brand-tint)" : "rgba(255,255,255,0.6)",
+                color: on ? "var(--brand-ink)" : "var(--muted)",
+                transition: "all .14s ease",
               }}
             >
               {item}
@@ -336,7 +459,7 @@ function ChipGroup({
 const linkBtn: React.CSSProperties = {
   background: "transparent",
   border: "none",
-  color: "var(--atlys-brand-blue)",
+  color: "var(--brand-ink)",
   cursor: "pointer",
   fontSize: 12,
   padding: 0,
