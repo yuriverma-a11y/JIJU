@@ -65,7 +65,7 @@ function FlightArc() {
     <svg
       viewBox="0 0 760 210"
       width="100%"
-      style={{ maxWidth: 620, display: "block", margin: "0 auto", overflow: "visible" }}
+      style={{ maxWidth: 460, display: "block", margin: "0 auto", overflow: "visible" }}
       aria-hidden
     >
       {/* faint full arc */}
@@ -145,7 +145,9 @@ export default function Page() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Only follow the conversation once it has started; on the empty hero we
+    // must not scroll (it would push the layout and leave a gap up top).
+    if (messages.length > 0) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   function grow() {
@@ -218,8 +220,9 @@ export default function Page() {
     }
   }
 
+  const empty = messages.length === 0;
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100vh", display: "grid", gridTemplateRows: "auto minmax(0, 1fr) auto", overflow: "hidden" }}>
       {/* Header */}
       <header
         style={{
@@ -261,8 +264,16 @@ export default function Page() {
       </header>
 
       {/* Conversation */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
-        <div style={{ maxWidth: 860, margin: "0 auto", padding: "28px 20px 16px" }}>
+      <div
+        style={{
+          minHeight: 0,
+          overflowY: empty ? "hidden" : "auto",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: empty ? "center" : "flex-start",
+        }}
+      >
+        <div style={{ maxWidth: 860, margin: "0 auto", width: "100%", padding: "14px 20px 12px" }}>
           {messages.length === 0 ? (
             <Hero onPick={(p, it) => { setIntent(it); setInput(p); setTimeout(grow, 0); taRef.current?.focus(); }} />
           ) : (
@@ -280,8 +291,8 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Composer — styled as a boarding pass */}
-      <div style={{ position: "sticky", bottom: 0, background: "linear-gradient(to top, var(--paper) 72%, transparent)", padding: "10px 20px 18px" }}>
+      {/* Composer — styled as a boarding pass (pinned to the bottom grid row) */}
+      <div style={{ background: "linear-gradient(to top, var(--paper) 72%, transparent)", padding: "8px 20px 12px" }}>
         <div
           style={{
             maxWidth: 860,
@@ -290,7 +301,8 @@ export default function Page() {
             borderRadius: "var(--radius)",
             background: "var(--paper-2)",
             boxShadow: "var(--shadow-lg)",
-            overflow: "hidden",
+            // visible so the country dropdowns can open upward without being clipped
+            overflow: "visible",
           }}
         >
           {/* Boarding-pass header strip */}
@@ -299,9 +311,11 @@ export default function Page() {
               display: "flex",
               alignItems: "center",
               gap: 10,
-              padding: "8px 16px",
+              padding: "6px 14px",
               background: "linear-gradient(100deg, var(--ink), #1c2a45)",
               color: "#fff",
+              borderTopLeftRadius: "calc(var(--radius) - 1px)",
+              borderTopRightRadius: "calc(var(--radius) - 1px)",
             }}
           >
             <TravelIcon name="plane" size={15} />
@@ -319,7 +333,7 @@ export default function Page() {
           </div>
 
           {/* Fields row */}
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", gap: 8, padding: "12px 14px 4px" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", gap: 8, padding: "10px 14px 2px" }}>
             <CountrySelect label="Destination" value={destination} options={DESTINATION_OPTIONS} onChange={setDestination} />
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <CountrySelect label="Citizenship" value={citizenship} options={COUNTRY_OPTIONS} onChange={setCitizenship} />
@@ -332,10 +346,10 @@ export default function Page() {
           </div>
 
           {/* Perforated divider */}
-          <div className="jiju-perforate" style={{ height: 2, margin: "10px 14px 4px" }} />
+          <div className="jiju-perforate" style={{ height: 2, margin: "7px 14px 2px" }} />
 
           {/* Prompt + actions */}
-          <div style={{ padding: "6px 14px 14px" }}>
+          <div style={{ padding: "4px 14px 10px" }}>
             <textarea
               ref={taRef}
               value={input}
@@ -414,7 +428,7 @@ export default function Page() {
             </div>
           </div>
         </div>
-        <div style={{ maxWidth: 860, margin: "8px auto 0", textAlign: "center", fontSize: 11.5, color: "var(--muted)" }}>
+        <div style={{ maxWidth: 860, margin: "6px auto 0", textAlign: "center", fontSize: 11, color: "var(--muted)" }}>
           JIJU grounds facts on live atlys.com and never uses em or en dashes. Verify figures before publishing.
         </div>
       </div>
@@ -424,40 +438,38 @@ export default function Page() {
 
 function Hero({ onPick }: { onPick: (prompt: string, intent: string) => void }) {
   return (
-    <div className="jiju-rise" style={{ position: "relative", padding: "26px 0 14px" }}>
+    <div className="jiju-rise" style={{ position: "relative", padding: "6px 0 4px" }}>
       {/* Stamp seal, offset top-right */}
-      <div style={{ position: "absolute", top: -2, right: 4, zIndex: 2 }}>
-        <StampSeal size={120} />
+      <div style={{ position: "absolute", top: -4, right: 0, zIndex: 2 }}>
+        <StampSeal size={92} />
       </div>
 
       {/* Animated flight arc */}
-      <div style={{ marginBottom: -28 }}>
+      <div style={{ marginBottom: -42 }}>
         <FlightArc />
       </div>
 
       <div style={{ position: "relative", textAlign: "center", maxWidth: 640, margin: "0 auto" }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 14px", borderRadius: 999, border: "1px solid var(--line-strong)", background: "rgba(255,255,255,0.6)", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--gold)" }}>
-          <TravelIcon name="compass" size={14} /> Now departing
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "4px 13px", borderRadius: 999, border: "1px solid var(--line-strong)", background: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--gold)" }}>
+          <TravelIcon name="compass" size={13} /> Now departing
         </div>
         <h1
           style={{
             fontFamily: "var(--font-serif)",
-            fontSize: 54,
+            fontSize: 40,
             fontWeight: 600,
             letterSpacing: "-0.025em",
-            margin: "16px 0 12px",
-            lineHeight: 1.03,
+            margin: "10px 0 8px",
+            lineHeight: 1.04,
             color: "var(--ink)",
           }}
         >
-          What should we
-          <br />
-          create <span style={{ fontStyle: "italic", color: "var(--brand)" }}>today?</span>
+          What should we create <span style={{ fontStyle: "italic", color: "var(--brand)" }}>today?</span>
         </h1>
-        <p style={{ color: "var(--ink-soft)", fontSize: 16.5, margin: "0 auto 30px", maxWidth: 500, lineHeight: 1.6 }}>
+        <p style={{ color: "var(--ink-soft)", fontSize: 14, margin: "0 auto 12px", maxWidth: 460, lineHeight: 1.5 }}>
           Your concierge for Atlys content. FAQs, blog hubs, or a full knowledge base, grounded on live atlys.com facts and written in the Atlys voice.
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, maxWidth: 560, margin: "0 auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, maxWidth: 520, margin: "0 auto" }}>
           {EXAMPLES.map((ex) => (
             <button
               key={ex.title}
@@ -466,7 +478,7 @@ function Hero({ onPick }: { onPick: (prompt: string, intent: string) => void }) 
               style={{
                 position: "relative",
                 textAlign: "left",
-                padding: 16,
+                padding: 13,
                 borderRadius: "var(--radius-sm)",
                 border: "1px solid var(--line-strong)",
                 background: "var(--paper-2)",
@@ -478,9 +490,9 @@ function Hero({ onPick }: { onPick: (prompt: string, intent: string) => void }) 
               onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "var(--shadow-md)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "var(--shadow-sm)"; }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <span style={{ display: "inline-grid", placeItems: "center", width: 34, height: 34, borderRadius: 9, background: "var(--brand-tint)", color: "var(--brand-ink)" }}>
-                  <TravelIcon name={ex.icon} size={19} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 7 }}>
+                <span style={{ display: "inline-grid", placeItems: "center", width: 30, height: 30, borderRadius: 8, background: "var(--brand-tint)", color: "var(--brand-ink)" }}>
+                  <TravelIcon name={ex.icon} size={17} />
                 </span>
                 <span style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.12em", color: "var(--muted)", border: "1px dashed var(--line-strong)", borderRadius: 6, padding: "2px 6px" }}>
                   {ex.code}

@@ -146,8 +146,12 @@ export async function runChatStream(
       clusters: kw.clusters,
       source: src,
     });
+    // Budget tokens to the requested count so short batches finish fast (and
+    // never hit the serverless timeout, which returns a non-JSON error body).
+    const faqCount = count || 10;
+    const faqTokens = Math.min(5000, faqCount * 320 + 500);
     const raw = await streamCompletion(
-      { system: BRAND_VOICE_SYSTEM, prompt, maxTokens: 8000 },
+      { system: BRAND_VOICE_SYSTEM, prompt, maxTokens: faqTokens },
       (d) => emit({ type: "delta", text: d }),
     );
     // Parse the streamed output; if it was truncated or malformed, fall back to
@@ -158,7 +162,7 @@ export async function runChatStream(
       const jsonRaw = await generateJson({
         system: BRAND_VOICE_SYSTEM,
         prompt: `${prompt}\n\nReturn ONLY a JSON object: {"faqs":[{"question","answer","targetKeywords":[],"factsUsed":[]}]}.`,
-        maxTokens: 8000,
+        maxTokens: faqTokens,
       });
       parsed = parseFaqs(jsonRaw);
     }
@@ -222,7 +226,7 @@ export async function runChatStream(
       sourceText,
     });
     const raw = await streamCompletion(
-      { system: BLOG_SYSTEM, prompt, maxTokens: 8000 },
+      { system: BLOG_SYSTEM, prompt, maxTokens: 5500 },
       (d) => emit({ type: "delta", text: d }),
     );
     const markdown = stripEmEnDashes(raw).trim();
@@ -259,7 +263,7 @@ export async function runChatStream(
         avoid: collected.slice(-30).map((q) => q.question),
       });
       try {
-        const raw = await generateJson({ system: KB_SYSTEM, prompt, maxTokens: 4000 });
+        const raw = await generateJson({ system: KB_SYSTEM, prompt, maxTokens: 1800 });
         const parsed = safeJson(raw) as { questions?: string[] };
         for (const q of parsed.questions ?? []) {
           collected.push({
@@ -291,7 +295,7 @@ export async function runChatStream(
     ? `Context: destination ${entityDisplayName(entity)}, citizenship ${countryName(citizenship)}, residence ${countryName(residence)}.`
     : `Context: citizenship ${countryName(citizenship)}, residence ${countryName(residence)}.`;
   const raw = await streamCompletion(
-    { system: FREEFORM_SYSTEM, prompt: `${opts.message}\n\n${ctx}`, maxTokens: 8000 },
+    { system: FREEFORM_SYSTEM, prompt: `${opts.message}\n\n${ctx}`, maxTokens: 3500 },
     (d) => emit({ type: "delta", text: d }),
   );
   const md = stripEmEnDashes(raw).trim();

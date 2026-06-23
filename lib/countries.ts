@@ -379,9 +379,13 @@ export const WORLD_COUNTRIES: Array<{ iso2: string; name: string }> = [
   ...ALL_COUNTRIES.filter((c) => !PRIORITY_ISO.includes(c.iso2)),
 ];
 
+// Sentinel value for a worldwide audience (KB citizenship/residence pickers).
+export const GLOBAL_AUDIENCE = "GLOBAL";
+
 /** Display name for any ISO-2 (world list first, then destinations, else the code). */
 export function countryName(iso2: string): string {
   const u = iso2.toUpperCase();
+  if (u === GLOBAL_AUDIENCE) return "a global audience";
   const w = WORLD_COUNTRIES.find((c) => c.iso2 === u);
   if (w) return w.name;
   const d = COUNTRIES.find((c) => c.iso2 === u);

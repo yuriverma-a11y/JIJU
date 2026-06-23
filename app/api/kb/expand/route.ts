@@ -60,7 +60,9 @@ export async function POST(req: Request) {
       count: body.count,
       avoid: body.avoid,
     });
-    const raw = await generateJson({ system: KB_SYSTEM, prompt, maxTokens: 4000 });
+    // Short question lists do not need a big budget; keep it tight so the
+    // request returns well within the function timeout.
+    const raw = await generateJson({ system: KB_SYSTEM, prompt, maxTokens: 1800 });
     const parsed = QuestionsZ.parse(safeJson(raw));
     const questions = parsed.questions
       .map((q) => stripDashes(q).trim())

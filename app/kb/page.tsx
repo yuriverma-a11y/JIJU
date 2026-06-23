@@ -5,6 +5,7 @@ import { JijuMark } from "@/components/chat";
 import { AtlysLogo, TravelIcon } from "@/components/brand";
 import { Badge, Button, Field, Select, Spinner, Text, TextInput } from "@/components/ds";
 import {
+  GLOBAL_AUDIENCE,
   GROUPS,
   WORLD_COUNTRIES,
   countryName as isoName,
@@ -16,11 +17,29 @@ import { kbFilename, toKbJson, toKbMarkdown } from "@/lib/kb-export";
 import { CATEGORIES, VISA_TYPES } from "@/lib/kb-taxonomy";
 import type { KbDataset, KbQuestion } from "@/lib/kb-types";
 
+// How many KB slices to expand at once (independent LLM requests).
+const KB_CONCURRENCY = 4;
+
 const DESTINATION_OPTIONS = [
   ...GROUPS.map((g) => ({ value: g.id, label: `${g.name} (group)` })),
   ...WORLD_COUNTRIES.map((c) => ({ value: c.iso2, label: c.name })),
 ];
-const COUNTRY_OPTIONS = WORLD_COUNTRIES.map((c) => ({ value: c.iso2, label: c.name }));
+// Citizenship / residence: a worldwide audience first, then every country.
+const COUNTRY_OPTIONS = [
+  { value: GLOBAL_AUDIENCE, label: "Global (any country)" },
+  ...WORLD_COUNTRIES.map((c) => ({ value: c.iso2, label: c.name })),
+];
+
+/** Read a Response as JSON, tolerating a non-JSON body (e.g. a timeout page). */
+async function readJson(res: Response): Promise<any> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const snippet = text.trim().slice(0, 140) || `HTTP ${res.status}`;
+    return { error: snippet };
+  }
+}
 
 /* ------------------------------- panel ---------------------------------- */
 
@@ -85,6 +104,8 @@ export default function KbPage() {
   const [toast, setToast] = useState("");
   const stopRef = useRef(false);
   const idRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const collectedRef = useRef<KbQuestion[]>([]);
 
   const countryName = useMemo(() => {
     const e = resolveEntity(destination);
@@ -109,14 +130,24 @@ export default function KbPage() {
     setList(list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
   }
 
+  function stop() {
+    stopRef.current = true;
+    abortRef.current?.abort(); // cancel any in-flight slice immediately
+  }
+
+  function sync() {
+    setQuestions(dedupeQuestions([...collectedRef.current]));
+  }
+
   async function build() {
     setRunning(true);
     setError("");
     setQuestions([]);
     stopRef.current = false;
     idRef.current = 0;
-
-    let collected: KbQuestion[] = [];
+    collectedRef.current = [];
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     // 1) Seed from SEMrush question keywords (best-effort).
     try {
@@ -124,13 +155,14 @@ export default function KbPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ destination, residence }),
+        signal: controller.signal,
       });
       if (r.ok) {
-        const data = await r.json();
+        const data = await readJson(r);
         for (const cl of data.clusters ?? []) {
           for (const k of cl.keywords ?? []) {
             if (k.isQuestion) {
-              collected.push({
+              collectedRef.current.push({
                 id: `q${++idRef.current}`,
                 question: k.phrase,
                 visaType: "General",
@@ -144,56 +176,67 @@ export default function KbPage() {
     } catch {
       /* seeding is optional */
     }
-    collected = dedupeQuestions(collected);
-    setQuestions([...collected]);
+    sync();
 
-    // 2) Expand the selected slices until we hit the target (or run out).
+    // 2) Expand the selected slices in parallel (a small worker pool) until we
+    //    hit the target or run out. Each slice is an independent request, so a
+    //    slow or failed one never blocks the others.
     const slices: Array<{ visaType: string; category: string }> = [];
     for (const vt of visaTypes) for (const cat of categories) slices.push({ visaType: vt, category: cat });
     setProgress({ slice: 0, total: slices.length });
 
-    for (let i = 0; i < slices.length; i++) {
-      if (stopRef.current || collected.length >= targetCount) break;
-      const s = slices[i];
-      setProgress({ slice: i + 1, total: slices.length });
-      try {
-        const avoid = collected.slice(-40).map((q) => q.question);
-        const res = await fetch("/api/kb/expand", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            destination,
-            citizenship,
-            residence,
-            visaType: s.visaType,
-            category: s.category,
-            count: 30,
-            avoid,
-          }),
-        });
-        if (!res.ok) {
-          const e = await res.json();
-          setError(e.detail ? `${e.error}: ${e.detail}` : e.error);
-          if (res.status === 400) break;
-          continue;
-        }
-        const data = await res.json();
-        for (const q of data.questions ?? []) {
-          collected.push({
-            id: `q${++idRef.current}`,
-            question: q,
-            visaType: s.visaType,
-            category: s.category,
-            source: "generated",
+    let next = 0;
+    let done = 0;
+    let lastError = "";
+
+    async function worker() {
+      while (!stopRef.current && collectedRef.current.length < targetCount) {
+        const i = next++;
+        if (i >= slices.length) return;
+        const s = slices[i];
+        try {
+          const avoid = collectedRef.current.slice(-40).map((q) => q.question);
+          const res = await fetch("/api/kb/expand", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              destination,
+              citizenship,
+              residence,
+              visaType: s.visaType,
+              category: s.category,
+              count: 30,
+              avoid,
+            }),
+            signal: controller.signal,
           });
+          const data = await readJson(res);
+          if (!res.ok) {
+            lastError = data.detail ? `${data.error}: ${data.detail}` : data.error || `HTTP ${res.status}`;
+          } else {
+            for (const q of data.questions ?? []) {
+              collectedRef.current.push({
+                id: `q${++idRef.current}`,
+                question: q,
+                visaType: s.visaType,
+                category: s.category,
+                source: "generated",
+              });
+            }
+            sync();
+          }
+        } catch (err) {
+          if (controller.signal.aborted) return;
+          lastError = String(err);
+        } finally {
+          done++;
+          setProgress({ slice: done, total: slices.length });
         }
-        collected = dedupeQuestions(collected);
-        setQuestions([...collected]);
-      } catch (err) {
-        setError(String(err));
       }
     }
 
+    await Promise.all(Array.from({ length: KB_CONCURRENCY }, worker));
+    if (lastError && collectedRef.current.length === 0) setError(lastError);
     setRunning(false);
   }
 
@@ -346,7 +389,7 @@ export default function KbPage() {
               {running ? "Building" : "Build knowledge base"}
             </Button>
             {running && (
-              <Button variant="secondary" color="red" onClick={() => (stopRef.current = true)}>Stop</Button>
+              <Button variant="secondary" color="red" onClick={stop}>Stop</Button>
             )}
             <Text color="var(--muted)" style={{ fontSize: 12 }}>
               {visaTypes.length} visa types × {categories.length} topics
